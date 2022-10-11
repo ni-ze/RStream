@@ -38,21 +38,17 @@ public class FilterActionSupplier<T> implements Supplier<Processor<T>> {
 
     private class FilterProcessor extends AbstractProcessor<T> {
         private final FilterAction<T> filterAction;
-        private StreamContext<T>  context;
+
 
         public FilterProcessor(FilterAction<T> filterAction) {
             this.filterAction = filterAction;
         }
 
 
-        @Override
-        public void preProcess(StreamContext<T>  context) {
-            this.context = context;
-            this.context.init(super.getChildren());
-        }
+
 
         @Override
-        public  void process(T data) {
+        public  void process(T data) throws Throwable {
             boolean pass = filterAction.apply(data);
             if (pass) {
                 Context<Object, T> result = new Context<>(this.context.getKey(), data);

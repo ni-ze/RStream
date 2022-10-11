@@ -20,14 +20,13 @@ import org.apache.rocketmq.streams.function.KeySelectAction;
 import org.apache.rocketmq.streams.metadata.Context;
 import org.apache.rocketmq.streams.running.AbstractProcessor;
 import org.apache.rocketmq.streams.running.Processor;
-import org.apache.rocketmq.streams.running.StreamContext;
 
 import java.util.function.Supplier;
 
-public class KeySelectActionSupplier<T, KEY> implements Supplier<Processor<T>> {
-    private final KeySelectAction<T, KEY> keySelectAction;
+public class KeySelectActionSupplier<KEY, T> implements Supplier<Processor<T>> {
+    private final KeySelectAction<KEY, T> keySelectAction;
 
-    public KeySelectActionSupplier(KeySelectAction<T, KEY> keySelectAction) {
+    public KeySelectActionSupplier(KeySelectAction<KEY, T> keySelectAction) {
         this.keySelectAction = keySelectAction;
     }
 
@@ -37,25 +36,21 @@ public class KeySelectActionSupplier<T, KEY> implements Supplier<Processor<T>> {
     }
 
     private class MapperProcessor extends AbstractProcessor<T> {
-        private final KeySelectAction<T, KEY> keySelectAction;
-        private StreamContext<T> streamContext;
+        private final KeySelectAction<KEY, T> keySelectAction;
 
-        public MapperProcessor(KeySelectAction<T, KEY> keySelectAction) {
+
+        public MapperProcessor(KeySelectAction<KEY, T> keySelectAction) {
             this.keySelectAction = keySelectAction;
         }
 
-        @Override
-        public void preProcess(StreamContext<T> context) {
-            this.streamContext = context;
-            this.streamContext.init(super.getChildren());
-        }
+
 
         @Override
-        public void process(T data) {
+        public void process(T data) throws Throwable {
             KEY newKey = keySelectAction.select(data);
 
             Context<KEY, T> context = new Context<>(newKey, data);
-            this.streamContext.forward(context);
+            this.context.forward(context);
         }
     }
 }

@@ -16,42 +16,73 @@ package org.apache.rocketmq.streams.function.supplier;
  * limitations under the License.
  */
 
-import org.apache.rocketmq.streams.metadata.Context;
+import org.apache.rocketmq.client.producer.DefaultMQProducer;
+import org.apache.rocketmq.client.producer.selector.SelectMessageQueueByHash;
+import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.streams.common.Constant;
 import org.apache.rocketmq.streams.running.AbstractProcessor;
 import org.apache.rocketmq.streams.running.Processor;
 import org.apache.rocketmq.streams.running.StreamContext;
+import org.apache.rocketmq.streams.serialization.KeyValueSerializer;
 
 import java.util.function.Supplier;
 
-public class SinkSupplier<T> implements Supplier<Processor<T>> {
-    private String topicName;
+public class SinkSupplier<K, T> implements Supplier<Processor<T>> {
+    private final String topicName;
+    private final KeyValueSerializer<K, T> serializer;
 
-    public SinkSupplier(String topicName) {
+    public SinkSupplier(String topicName, KeyValueSerializer<K, T> serializer) {
         this.topicName = topicName;
+        this.serializer = serializer;
     }
 
     @Override
     public Processor<T> get() {
-        return new SinkProcessor();
+        return new SinkProcessor(this.topicName, this.serializer);
     }
 
     private class SinkProcessor extends AbstractProcessor<T> {
-        private StreamContext<T> context;
+        private final String topicName;
+        private DefaultMQProducer producer;
+        private final KeyValueSerializer<K, T> serializer;
+        private K key;
 
-        @Override
-        public void preProcess(StreamContext<T> context) {
-            this.context = context;
-            this.context.init(null);
+        public SinkProcessor(String topicName, KeyValueSerializer<K, T> serializer) {
+            this.topicName = topicName;
+            this.serializer = serializer;
         }
 
         @Override
-        public void process(T data) {
-            if (data != null) {
-                Context<Object, T> result = new Context<>(this.context.getKey(), data);
-                result.setSinkTopic(topicName);
-                this.context.forward(result);
-            }
+        public void preProcess(StreamContext<T> context) {
+            this.producer = context.getDefaultMQProducer();
+            this.key = context.getKey();
+        }
 
+        @Override
+        public void process(T data) throws Throwable {
+            if (data != null) {
+                Message message;
+
+                //todo 异常体系，哪些可以不必中断线程，哪些是需要中断的？
+                byte[] value = this.serializer.serialize(key, data);
+                if (this.key == null) {
+                    message = new Message(this.topicName, value);
+
+                    message.putUserProperty(Constant.SHUFFLE_KEY_CLASS_NAME, null);
+                    message.putUserProperty(Constant.SHUFFLE_VALUE_CLASS_NAME, data.getClass().getName());
+
+                    producer.send(message);
+                } else {
+                    message = new Message(this.topicName, value);
+
+                    message.setKeys(String.valueOf(this.key.hashCode()));
+
+                    message.putUserProperty(Constant.SHUFFLE_KEY_CLASS_NAME, this.key.getClass().getName());
+                    message.putUserProperty(Constant.SHUFFLE_VALUE_CLASS_NAME, data.getClass().getName());
+
+                    producer.send(message, new SelectMessageQueueByHash(), this.key);
+                }
+            }
         }
     }
 }

@@ -24,20 +24,16 @@ public class FlatMapSupplier<T, VR> implements Supplier<Processor<T>> {
 
     static class FlatMapProcessor<T, VR> extends AbstractProcessor<T> {
         private final ValueMapperAction<? super T, ? extends Iterable<? extends VR>> valueMapperAction;
-        private StreamContext<T> context;
+
 
         public FlatMapProcessor(ValueMapperAction<? super T, ? extends Iterable<? extends VR>> valueMapperAction) {
             this.valueMapperAction = valueMapperAction;
         }
 
-        @Override
-        public void preProcess(StreamContext<T> context) {
-            this.context = context;
-            this.context.init(super.getChildren());
-        }
+
 
         @Override
-        public void process(T data) {
+        public void process(T data) throws Throwable {
 
             Iterable<? extends VR> converts = valueMapperAction.convert(data);
 

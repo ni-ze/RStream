@@ -53,7 +53,6 @@ public class AggregateActionSupplier<K, V, OV> implements Supplier<Processor<V>>
         private final Supplier<OV> initAction;
         private final StateStore<K, OV> stateStore;
         private final AggregateAction<K, V, OV> aggregateAction;
-        private StreamContext<V> context;
 
         public AggregateProcessor(String currentName, String parentName,
                                   StateStore<K, OV> stateStore, Supplier<OV> initAction,
@@ -67,14 +66,9 @@ public class AggregateActionSupplier<K, V, OV> implements Supplier<Processor<V>>
             this.stateStore.init();
         }
 
-        @Override
-        public void preProcess(StreamContext<V> context) {
-            this.context = context;
-            this.context.init(super.getChildren());
-        }
 
         @Override
-        public void process(V data) {
+        public void process(V data) throws Throwable {
             K key = this.context.getKey();
             OV value = stateStore.get(key);
             if (value == null) {
@@ -90,21 +84,5 @@ public class AggregateActionSupplier<K, V, OV> implements Supplier<Processor<V>>
             this.context.forward(convert);
         }
 
-        //1
-//        @Override
-//        public void process(Context<K, V> context) {
-//            K key = context.getKey();
-//            OV value = stateStore.get(key);
-//            if (value == null) {
-//                value = initAction.get();
-//            }
-//            OV out = aggregateAction.calculate(key, context.getValue(), value);
-//
-//            stateStore.put(key, out);
-//
-//            Context<K, V> result = super.convert(context.value(out));
-//
-//            this.context.forward(result);
-//        }
     }
 }

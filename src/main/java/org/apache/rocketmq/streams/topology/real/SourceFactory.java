@@ -27,9 +27,9 @@ public class SourceFactory<T> implements RealProcessorFactory<T> {
     private final String name;
     private final String topic;
     private final List<RealProcessorFactory<T>> children = new ArrayList<>();
-    private final Supplier<? extends Processor<T>> supplier;
+    private final Supplier<Processor<T>> supplier;
 
-    public SourceFactory(String name, String topic, Supplier<? extends Processor<T>> supplier) {
+    public SourceFactory(String name, String topic, Supplier<Processor<T>> supplier) {
         this.name = name;
         this.topic = topic;
         this.supplier = supplier;

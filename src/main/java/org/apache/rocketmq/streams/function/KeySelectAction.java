@@ -17,6 +17,6 @@ package org.apache.rocketmq.streams.function;
  */
 
 @FunctionalInterface
-public interface KeySelectAction<IN, KEY> {
+public interface KeySelectAction<KEY, IN> {
     KEY select(IN value);
 }

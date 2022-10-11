@@ -23,7 +23,7 @@ import org.apache.rocketmq.streams.topology.TopologyBuilder;
 import java.util.HashMap;
 import java.util.Set;
 
-public class MessageQueueListenerWrapper implements MessageQueueListener {
+class MessageQueueListenerWrapper implements MessageQueueListener {
     private static final String pattern = "%s@%s";
     private final MessageQueueListener originListener;
     private final TopologyBuilder topologyBuilder;
@@ -31,7 +31,7 @@ public class MessageQueueListenerWrapper implements MessageQueueListener {
     private final HashMap<String, Processor<?>> mq2Processor = new HashMap<>();
 
 
-    public MessageQueueListenerWrapper(MessageQueueListener originListener, TopologyBuilder topologyBuilder) {
+    MessageQueueListenerWrapper(MessageQueueListener originListener, TopologyBuilder topologyBuilder) {
         this.originListener = originListener;
         this.topologyBuilder = topologyBuilder;
     }
@@ -48,24 +48,25 @@ public class MessageQueueListenerWrapper implements MessageQueueListener {
 
         //在构建好执行processor之后，才执行原始listener
         originListener.messageQueueChanged(topic, mqAll, mqDivided);
-
     }
 
+    //todo 本实例消费的所有的q都重新build了一遍，但是存在前后两次重平衡消费不变的q，不需要build得到新的processor了
     private <T> void buildTask(String topicName, Set<MessageQueue> mqDivided) {
-        Processor<T> processor = topologyBuilder.build(topicName);
         for (MessageQueue messageQueue : mqDivided) {
+            Processor<T> processor = topologyBuilder.build(topicName);
             String key = buildKey(messageQueue.getTopic(), messageQueue.getQueueId());
+            //todo 不同的q使用的processor为什么是一样的？不同的q应该使用不一样的processor实例。
             this.mq2Processor.put(key, processor);
         }
     }
 
-     @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked")
     <T> Processor<T> selectProcessor(String key) {
 //        String key = buildKey(topic, queueId);
         return (Processor<T>) this.mq2Processor.get(key);
     }
 
-    public String buildKey(String topic, int queueId) {
+    String buildKey(String topic, int queueId) {
         return String.format(pattern, topic, queueId);
     }
 }

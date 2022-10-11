@@ -18,6 +18,7 @@ package org.apache.rocketmq.streams.rstream;
 
 import org.apache.rocketmq.streams.OperatorNameMaker;
 import org.apache.rocketmq.streams.function.supplier.AggregateActionSupplier;
+import org.apache.rocketmq.streams.serialization.serImpl.AvroSerializer;
 import org.apache.rocketmq.streams.state.DefaultStore;
 import org.apache.rocketmq.streams.state.RocksDBStore;
 import org.apache.rocketmq.streams.topology.virtual.GraphNode;

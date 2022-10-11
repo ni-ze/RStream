@@ -23,11 +23,19 @@ import java.util.Collections;
 import java.util.List;
 
 public abstract class AbstractProcessor<T> implements Processor<T> {
+
     private final List<Processor<T>> children = new ArrayList<>();
+    protected StreamContext<T> context;
 
     @Override
     public void addChild(Processor<T> processor) {
         children.add(processor);
+    }
+
+    @Override
+    public void preProcess(StreamContext<T> context) throws Throwable {
+        this.context = context;
+        this.context.init(getChildren());
     }
 
     protected List<Processor<T>> getChildren() {

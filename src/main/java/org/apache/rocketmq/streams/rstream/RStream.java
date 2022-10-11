@@ -21,20 +21,22 @@ import org.apache.rocketmq.streams.function.FilterAction;
 import org.apache.rocketmq.streams.function.ForeachAction;
 import org.apache.rocketmq.streams.function.KeySelectAction;
 import org.apache.rocketmq.streams.function.ValueMapperAction;
+import org.apache.rocketmq.streams.serialization.KeyValueSerializer;
+import org.apache.rocketmq.streams.serialization.Serializer;
 
 public interface RStream<T> {
 
     <O> RStream<O> map(ValueMapperAction<T, O> mapperAction);
 
-    <VR> RStream<T> flatMapValues(final ValueMapperAction<? super T, ? extends Iterable<? extends VR>> mapper);
+    <VR> RStream<T> flatMapValues(final ValueMapperAction<? extends T, ? extends Iterable<? extends VR>> mapper);
 
     RStream<T> filter(FilterAction<T> predictor);
 
-    <K> GroupedStream<T,K> keyBy(KeySelectAction<T, K> keySelectAction);
+    <K> GroupedStream<K,T> keyBy(KeySelectAction<K, T> keySelectAction);
 
     void print();
 
     void foreach(ForeachAction<T> foreachAction);
 
-    void sink(String topicName);
+    <K> void sink(String topicName, KeyValueSerializer<K, T> serializer);
 }

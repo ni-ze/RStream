@@ -20,10 +20,10 @@ public interface Processor<T> extends AutoCloseable {
     void addChild(Processor<T> processor);
 
 
-    void preProcess(StreamContext<T> context);
+    void preProcess(StreamContext<T> context) throws Throwable;
 
 
-    void process(T data);
+    void process(T data) throws Throwable;
 
 
 }

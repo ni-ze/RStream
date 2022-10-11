@@ -40,20 +40,16 @@ public class ValueActionSupplier<T, O> implements Supplier<Processor<T>> {
 
     static class ValueMapperProcessor<T, O> extends AbstractProcessor<T> {
         private final ValueMapperAction<T, O> valueMapperAction;
-        private StreamContext<T> context;
+
 
         public ValueMapperProcessor(ValueMapperAction<T, O> valueMapperAction) {
             this.valueMapperAction = valueMapperAction;
         }
 
-        @Override
-        public void preProcess(StreamContext<T> context) {
-            this.context = context;
-            this.context.init(super.getChildren());
-        }
+
 
         @Override
-        public void process(T data) {
+        public void process(T data) throws Throwable {
             O convert = valueMapperAction.convert(data);
 
             if (convert instanceof Iterable) {

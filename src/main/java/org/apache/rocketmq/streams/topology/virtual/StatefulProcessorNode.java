@@ -20,6 +20,8 @@ import org.apache.rocketmq.streams.OperatorNameMaker;
 import org.apache.rocketmq.streams.function.supplier.SinkSupplier;
 import org.apache.rocketmq.streams.function.supplier.SourceSupplier;
 import org.apache.rocketmq.streams.running.Processor;
+import org.apache.rocketmq.streams.serialization.deImpl.KVAvroDeserializer;
+import org.apache.rocketmq.streams.serialization.serImpl.KVAvroSerializer;
 import org.apache.rocketmq.streams.topology.TopologyBuilder;
 
 import java.util.function.Supplier;
@@ -39,10 +41,10 @@ public class StatefulProcessorNode<T> extends ProcessorNode<T> {
         String topicName = name + SUFFIX;
 
         String shuffleSinkName = OperatorNameMaker.makeName(SHUFFLE_SINK_PREFIX);
-        builder.addRealSink(shuffleSinkName, parentName, topicName, new SinkSupplier<>(topicName));
+        builder.addRealSink(shuffleSinkName, parentName, topicName, new SinkSupplier<>(topicName, new KVAvroSerializer<>()));
 
         String shuffleSourceName = OperatorNameMaker.makeName(SHUFFLE_SOURCE_PREFIX);
-        builder.addRealSource(shuffleSourceName, topicName, new SourceSupplier<>(topicName));
+        builder.addRealSource(shuffleSourceName, topicName, new SourceSupplier<>(topicName, new KVAvroDeserializer<>()));
 
         //构造一个状态存储
 //        RocksDBStore<K,V> rocksDBStore = new RocksDBStore<>();

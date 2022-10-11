@@ -16,37 +16,58 @@ package org.apache.rocketmq.streams.function.supplier;
  * limitations under the License.
  */
 
+import org.apache.rocketmq.common.Pair;
+import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.streams.common.Constant;
 import org.apache.rocketmq.streams.metadata.Context;
 import org.apache.rocketmq.streams.running.AbstractProcessor;
 import org.apache.rocketmq.streams.running.Processor;
 import org.apache.rocketmq.streams.running.StreamContext;
+import org.apache.rocketmq.streams.serialization.Deserializer;
+import org.apache.rocketmq.streams.serialization.KeyValueDeserializer;
 
 import java.util.function.Supplier;
 
-public class SourceSupplier<T> implements Supplier<Processor<T>> {
+public class SourceSupplier<K,V> implements Supplier<Processor<V>> {
     private String topicName;
+    private KeyValueDeserializer<K, V> deserializer;
 
-    public SourceSupplier(String topicName) {
+    public SourceSupplier(String topicName, KeyValueDeserializer<K, V> deserializer) {
         this.topicName = topicName;
+        this.deserializer = deserializer;
     }
 
     @Override
-    public Processor<T> get() {
-        return new SourceProcessor();
+    public Processor<V> get() {
+        return new SourceProcessorImpl(deserializer);
     }
 
-    private class SourceProcessor extends AbstractProcessor<T> {
-        private StreamContext<T> context;
+    public interface SourceProcessor<K, V> extends Processor<V> {
+        Pair<K, V> deserialize(byte[] data) throws Throwable;
+    }
 
-        @Override
-        public void preProcess(StreamContext<T> context) {
-            this.context = context;
-            this.context.init(super.getChildren());
+    private class SourceProcessorImpl extends AbstractProcessor<V> implements SourceProcessor<K,V> {
+        private KeyValueDeserializer<K, V> deserializer;
+
+
+        public SourceProcessorImpl(KeyValueDeserializer<K, V> deserializer) {
+            this.deserializer = deserializer;
         }
 
         @Override
-        public void process(T data) {
-            Context<Object, T> result = new Context<>(this.context.getKey(), data);
+        public void preProcess(StreamContext<V> context) throws Throwable {
+            super.preProcess(context);
+            this.deserializer.configure(context.getAdditional().get(Constant.SHUFFLE_KEY_CLASS_NAME), context.getAdditional().get(Constant.SHUFFLE_VALUE_CLASS_NAME));
+        }
+
+        @Override
+        public Pair<K, V> deserialize(byte[] data) throws Throwable {
+            return this.deserializer.deserialize(data);
+        }
+
+        @Override
+        public void process(V data) throws Throwable {
+            Context<K, V> result = new Context<>(this.context.getKey(), data);
             this.context.forward(result);
         }
     }

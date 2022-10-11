@@ -31,20 +31,18 @@ public class PrintActionSupplier<T> implements Supplier<Processor<T>> {
     }
 
     static class PrintProcessor<T> extends AbstractProcessor<T> {
-        private StreamContext<T> streamContext;
+
 
         public PrintProcessor() {
         }
 
-        @Override
-        public void preProcess(StreamContext<T> context) {
-            this.streamContext = context;
-            this.streamContext.init(super.getChildren());
-        }
 
         @Override
         public void process(T data) {
-            System.out.println("print sink: " + "key:[" + this.streamContext.getKey() + "]" + "value:[" + data + "]");
+            String template = "(key=%s, value=%s)";
+            String format = String.format(template, this.context.getKey(), data.toString());
+
+            System.out.println(format);
         }
     }
 

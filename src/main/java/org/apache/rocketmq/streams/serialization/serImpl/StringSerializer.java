@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 public class StringSerializer implements Serializer<String> {
 
     @Override
-    public byte[] serialize(String data) {
+    public byte[] serialize(String data) throws Throwable {
         if (data == null) {
             return new byte[0];
         }

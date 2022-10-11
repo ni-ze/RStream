@@ -29,6 +29,7 @@ import org.apache.rocketmq.tools.admin.DefaultMQAdminExt;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -37,16 +38,16 @@ import java.util.List;
  * 3、可获得动态的运行时信息，例如正在处理的数据来自那个topic，MQ，偏移量多少；
  */
 public class StreamContextImpl<T> implements StreamContext<T> {
-    private final Serde<T> serde;
+
     private final DefaultMQProducer producer;
     private final DefaultMQAdminExt mqAdmin;
     private final MessageExt messageExt;
     private final List<Processor<T>> childList = new ArrayList<>();
     private Object key;
 
+    private HashMap<String, Object> additional = new HashMap<>();
 
-    public StreamContextImpl(Serde<T> serde, DefaultMQProducer producer, DefaultMQAdminExt mqAdmin, MessageExt messageExt) {
-        this.serde = serde;
+    public StreamContextImpl(DefaultMQProducer producer, DefaultMQAdminExt mqAdmin, MessageExt messageExt) {
         this.producer = producer;
         this.mqAdmin = mqAdmin;
         this.messageExt = messageExt;
@@ -72,24 +73,17 @@ public class StreamContextImpl<T> implements StreamContext<T> {
     }
 
     @Override
-    public <K> void forward(Context<K, T> context) {
-        if (childList.size() == 0 && !StringUtils.isEmpty(context.getSinkTopic())) {
-            //todo 创建compact topic
-            //根据不同key选择不同MessageQueue写入消息；
+    public DefaultMQProducer getDefaultMQProducer() {
+        return producer;
+    }
 
-            String key = String.valueOf(context.getKey());
-            String value = context.getValue().toString();
-            Message message = new Message(context.getSinkTopic(), "", key, value.getBytes(StandardCharsets.UTF_8));
+    @Override
+    public HashMap<String, Object> getAdditional() {
+        return additional;
+    }
 
-            try {
-                producer.send(message);
-            } catch (MQClientException | RemotingException | MQBrokerException | InterruptedException e) {
-                //todo 异常体系，哪些可以不必中断线程，哪些是需要中断的？
-                e.printStackTrace();
-            }
-
-            return;
-        }
+    @Override
+    public <K> void forward(Context<K, T> context) throws Throwable {
 
         this.key = context.getKey();
 

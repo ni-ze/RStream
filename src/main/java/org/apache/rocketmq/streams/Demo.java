@@ -17,14 +17,12 @@ package org.apache.rocketmq.streams;
  */
 
 import org.apache.rocketmq.common.MixAll;
-import org.apache.rocketmq.streams.common.Constant;
-import org.apache.rocketmq.streams.function.KeySelectAction;
+import org.apache.rocketmq.common.Pair;
 import org.apache.rocketmq.streams.function.ValueMapperAction;
-import org.apache.rocketmq.streams.rstream.RStream;
 import org.apache.rocketmq.streams.rstream.StreamBuilder;
-import org.apache.rocketmq.streams.serialization.Wrapper;
 import org.apache.rocketmq.streams.topology.TopologyBuilder;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -33,21 +31,15 @@ public class Demo {
     public static void main(String[] args) {
         StreamBuilder builder = new StreamBuilder();
 
-        RStream<String> rStream = builder.source("sourceTopic");
-
-        rStream.flatMapValues(new ValueMapperAction<String, List<String>>() {
-                    @Override
-                    public List<String> convert(String value) {
-                        String[] splits = value.toLowerCase().split("\\W+");
-                        return Arrays.asList(splits);
-                    }
+        builder.source("sourceTopic",  total -> {
+                    String value = new String(total, StandardCharsets.UTF_8);
+                    return new Pair<>(null, value);
                 })
-                .keyBy(new KeySelectAction<String, String>() {
-                    @Override
-                    public String select(String value) {
-                        return value;
-                    }
+                .flatMapValues((ValueMapperAction<String, List<String>>) value -> {
+                    String[] splits = value.toLowerCase().split("\\W+");
+                    return Arrays.asList(splits);
                 })
+                .keyBy(value -> value)
                 .count()
                 .toRStream()
                 .print();
@@ -56,7 +48,6 @@ public class Demo {
 
         Properties properties = new Properties();
         properties.putIfAbsent(MixAll.NAMESRV_ADDR_PROPERTY, "127.0.0.1:9876");
-        properties.putIfAbsent(Constant.DEFAULT_SERDE_CLASS_CONFIG, Wrapper.StringSerde.class.getName());
 
         RocketMQStream rocketMQStream = new RocketMQStream(topologyBuilder, properties);
 

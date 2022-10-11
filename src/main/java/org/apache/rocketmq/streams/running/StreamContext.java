@@ -16,8 +16,11 @@ package org.apache.rocketmq.streams.running;
  * limitations under the License.
  */
 
+import org.apache.rocketmq.client.producer.DefaultMQProducer;
+import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.streams.metadata.Context;
 
+import java.util.HashMap;
 import java.util.List;
 
 public interface StreamContext<V> {
@@ -26,5 +29,9 @@ public interface StreamContext<V> {
     <K> void setKey(K k);
     <K> K getKey();
 
-    <K> void forward(Context<K, V> context);
+    DefaultMQProducer getDefaultMQProducer();
+
+    HashMap<String, Object> getAdditional();
+
+    <K> void forward(Context<K, V> context) throws Throwable;
 }

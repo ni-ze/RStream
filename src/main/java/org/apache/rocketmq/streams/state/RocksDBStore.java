@@ -16,6 +16,8 @@ package org.apache.rocketmq.streams.state;
  * limitations under the License.
  */
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.remoting.common.RemotingUtil;
 import org.rocksdb.Options;
@@ -78,30 +80,34 @@ public class RocksDBStore<K, V> extends AbstractStore<K, V> {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public V get(K key) {
         if (key == null) {
             return null;
         }
 
         try {
-            byte[] bytes = ((String) key).getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = key.toString().getBytes(StandardCharsets.UTF_8);
             byte[] valueBytes = rocksDB.get(bytes);
 
             if (valueBytes == null || valueBytes.length == 0) {
                 return null;
             }
 
-            return (V) new String(valueBytes, StandardCharsets.UTF_8);
+            return (V) JSON.parse(valueBytes);
         } catch (Exception e) {
-            throw new RuntimeException();
+            throw new RuntimeException(e);
         }
     }
 
     @Override
     public void put(K key, V value) {
         try {
-            byte[] keyBytes = ((String) key).getBytes(StandardCharsets.UTF_8);
-            byte[] valueBytes = ((String) value).getBytes(StandardCharsets.UTF_8);
+            byte[] keyBytes = key.toString().getBytes(StandardCharsets.UTF_8);
+
+            byte[] valueBytes = JSON.toJSONBytes(value, SerializerFeature.WriteClassName);
+
+//            byte[] valueBytes = value.toString().getBytes(StandardCharsets.UTF_8);
             rocksDB.put(writeOptions, keyBytes, valueBytes);
         } catch (Exception e) {
             throw new RuntimeException("putWindowInstance to rocksdb error", e);

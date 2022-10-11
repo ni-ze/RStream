@@ -18,6 +18,8 @@ package org.apache.rocketmq.streams.topology.virtual;
 
 import org.apache.rocketmq.streams.function.supplier.SourceSupplier;
 import org.apache.rocketmq.streams.running.Processor;
+import org.apache.rocketmq.streams.serialization.Deserializer;
+import org.apache.rocketmq.streams.serialization.KeyValueDeserializer;
 import org.apache.rocketmq.streams.topology.TopologyBuilder;
 
 import java.util.function.Supplier;
@@ -27,10 +29,10 @@ public class SourceGraphNode<T> extends AbstractGraphNode {
     private String topicName;
 
 
-    public SourceGraphNode(String name, String topicName) {
+    public SourceGraphNode(String name, String topicName, KeyValueDeserializer<Void, T> deserializer) {
         super(name);
         this.topicName = topicName;
-        this.supplier = new SourceSupplier<>(topicName);
+        this.supplier = new SourceSupplier<>(topicName, deserializer);
     }
 
     @Override

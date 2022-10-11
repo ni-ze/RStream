@@ -21,10 +21,11 @@ import org.apache.rocketmq.client.consumer.MessageQueueListener;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
 import org.apache.rocketmq.common.MixAll;
+import org.apache.rocketmq.common.Pair;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.streams.common.Constant;
-import org.apache.rocketmq.streams.serialization.Serde;
+import org.apache.rocketmq.streams.function.supplier.SourceSupplier;
 import org.apache.rocketmq.streams.topology.TopologyBuilder;
 import org.apache.rocketmq.tools.admin.DefaultMQAdminExt;
 
@@ -32,15 +33,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
-import static org.apache.rocketmq.common.message.MessageConst.PROPERTY_KEYS;
 import static org.apache.rocketmq.streams.metadata.StreamConfig.ROCKETMQ_STREAMS_CONSUMER_GROUP;
 
 public class WorkerThread extends Thread {
     private final TopologyBuilder topologyBuilder;
-    private final Engine<?> engine;
+    private final Engine<?,?> engine;
     private final Properties properties;
 
     public WorkerThread(TopologyBuilder topologyBuilder, Properties properties) throws MQClientException {
@@ -60,7 +58,7 @@ public class WorkerThread extends Thread {
         DefaultMQAdminExt mqAdmin = rocketMQClient.getMQAdmin();
 
 
-        this.engine = new Engine<>(unionConsumer, producer, mqAdmin, wrapper::selectProcessor, wrapper::buildKey);
+        this.engine = new Engine<>(unionConsumer, producer, mqAdmin, wrapper);
     }
 
     @Override
@@ -78,22 +76,20 @@ public class WorkerThread extends Thread {
 
 
     @SuppressWarnings("unchecked")
-    class Engine<T> {
+    class Engine<K, V> {
         private final DefaultLitePullConsumer unionConsumer;
         private final DefaultMQProducer producer;
         private final DefaultMQAdminExt mqAdmin;
-        private final Function<String, Processor<T>> processorSelect;
-        private final BiFunction<String, Integer, String> keyBuilder;
+        private final MessageQueueListenerWrapper wrapper;
         private volatile boolean running = false;
 
         public Engine(DefaultLitePullConsumer unionConsumer, DefaultMQProducer producer,
                       DefaultMQAdminExt mqAdmin,
-                      Function<String, Processor<T>> processorSelect, BiFunction<String, Integer, String> keyBuilder) {
+                      MessageQueueListenerWrapper wrapper) {
             this.unionConsumer = unionConsumer;
             this.producer = producer;
             this.mqAdmin = mqAdmin;
-            this.processorSelect = processorSelect;
-            this.keyBuilder = keyBuilder;
+            this.wrapper = wrapper;
         }
 
         //todo 恢复状态
@@ -136,8 +132,8 @@ public class WorkerThread extends Thread {
                         continue;
                     }
 
-                    Serde<T> serde = getSerde();
-                    T value = makeValue(serde, messageExt);
+                    String keyClassName = messageExt.getUserProperty(Constant.SHUFFLE_KEY_CLASS_NAME);
+                    String valueClassName = messageExt.getUserProperty(Constant.SHUFFLE_VALUE_CLASS_NAME);
 
                     String topic = messageExt.getTopic();
                     int queueId = messageExt.getQueueId();
@@ -146,35 +142,24 @@ public class WorkerThread extends Thread {
                     set.add(queue);
 
 
-                    String key = keyBuilder.apply(topic, queueId);
-                    Processor<T> processor = this.processorSelect.apply(key);
+                    String key = wrapper.buildKey(topic, queueId);
+                    SourceSupplier.SourceProcessor<K, V> processor = (SourceSupplier.SourceProcessor<K, V>) wrapper.selectProcessor(key);
 
-                    StreamContextImpl<T> context = new StreamContextImpl<>(serde, producer, mqAdmin, messageExt);
-                    context.setKey(messageExt.getProperty(PROPERTY_KEYS));
+                    StreamContext<V> context = new StreamContextImpl<>(producer, mqAdmin, messageExt);
+                    context.getAdditional().put(Constant.SHUFFLE_KEY_CLASS_NAME, keyClassName);
+                    context.getAdditional().put(Constant.SHUFFLE_VALUE_CLASS_NAME, valueClassName);
 
                     processor.preProcess(context);
-                    processor.process(value);
+
+                    Pair<K, V> pair = processor.deserialize(body);
+                    context.setKey(pair.getObject1());
+
+                    processor.process(pair.getObject2());
                 }
 
                 //todo 每次都提交位点消耗太大，后面改成拉取消息放入buffer的形式。
                 this.unionConsumer.commit(set, true);
             }
-        }
-
-        private Serde<T> getSerde() throws Throwable {
-            String serDe = WorkerThread.this.properties.getProperty(Constant.DEFAULT_SERDE_CLASS_CONFIG);
-            Class<?> serDeClazz = Class.forName(serDe);
-            if (!Serde.class.isAssignableFrom(serDeClazz)) {
-                throw new IllegalArgumentException("serde class must implements interface org.apache.rocketmq.streams.serialization.Serde");
-            }
-
-            return (Serde<T>) serDeClazz.getDeclaredConstructor().newInstance();
-        }
-
-
-        private T makeValue(Serde<T> serde, MessageExt messageExt) throws Throwable {
-            byte[] body = messageExt.getBody();
-            return serde.deserializer().deserialize(body);
         }
 
         public void stop() {
